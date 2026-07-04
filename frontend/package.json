@@ -1,0 +1,21 @@
+{
+  "name": "votescout-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@arcgis/core": "^5.1.9",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.4",
+    "playwright": "^1.61.1",
+    "vite": "^8.1.1"
+  }
+}
