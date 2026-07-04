@@ -9,9 +9,9 @@ const GEOCODE_URL =
   'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates'
 
 const LOCATION_TYPES = [
-  { key: 'pollingLocations', label: 'Polling place', color: [36, 86, 166] }, // blue
-  { key: 'earlyVoteSites', label: 'Early voting', color: [192, 57, 43] }, // red
-  { key: 'dropOffLocations', label: 'Ballot drop-off', color: [27, 42, 74] }, // navy
+  { key: 'pollingLocations', label: 'Polling place', color: [192, 138, 45] }, // gold
+  { key: 'earlyVoteSites', label: 'Early voting', color: [31, 78, 121] }, // info blue
+  { key: 'dropOffLocations', label: 'Ballot drop-off', color: [15, 27, 45] }, // ink
 ]
 
 async function geocode(address) {
@@ -147,7 +147,7 @@ export default function ElectionMap({ elections, address }) {
   )
 
   return (
-    <div className="map-card">
+    <div className="card map-card">
       <div className="map-container" ref={containerRef} />
       <div className="map-legend">
         <span className="legend-item">

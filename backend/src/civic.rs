@@ -86,6 +86,7 @@ pub struct GoogleCandidate {
     pub name: Option<String>,
     pub party: Option<String>,
     pub candidate_url: Option<String>,
+    pub photo_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -212,7 +213,7 @@ fn google_error_summary(which: &str, status: u16, body: &str) -> String {
     format!("{which} returned HTTP {status}: {detail}")
 }
 
-// ---------- Mapping into VoteScout's API shape ----------
+// ---------- Mapping into Groma's API shape ----------
 
 pub fn map_election(election: &GoogleElection, info: &VoterInfoResponse) -> Value {
     // voterInfoQuery echoes the election it answered for; prefer that record.
@@ -287,6 +288,7 @@ fn map_contest(contest: &GoogleContest) -> Value {
             "name": c.name.clone().unwrap_or_else(|| "Unknown".to_string()),
             "party": c.party,
             "candidateUrl": c.candidate_url,
+            "photoUrl": c.photo_url,
         })).collect::<Vec<_>>(),
     })
 }

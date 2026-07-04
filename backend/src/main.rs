@@ -1,6 +1,8 @@
 mod briefing;
 mod civic;
 mod mock;
+mod office;
+mod photos;
 mod plan;
 mod pledge;
 
@@ -18,6 +20,8 @@ use tower_http::cors::CorsLayer;
 
 use briefing::{BatchBriefingRequest, BriefingCache, BriefingRequest};
 use civic::{CivicError, VoterInfoOutcome};
+use office::{OfficeCache, OfficeQuery};
+use photos::{PhotoCache, PhotoQuery};
 use plan::VotingPlanRequest;
 use pledge::PledgeCounts;
 
@@ -28,6 +32,8 @@ struct AppState {
     openrouter_key: Arc<Option<String>>,
     briefing_cache: BriefingCache,
     pledge_counts: PledgeCounts,
+    photo_cache: PhotoCache,
+    office_cache: OfficeCache,
 }
 
 #[derive(Deserialize)]
@@ -249,6 +255,84 @@ async fn briefings_batch(
         .into_response()
 }
 
+async fn office_context(
+    State(state): State<AppState>,
+    Query(q): Query<OfficeQuery>,
+) -> (StatusCode, Json<Value>) {
+    if q.office.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": "INVALID_REQUEST", "message": "office is required" } })),
+        );
+    }
+
+    let Some(api_key) = state.openrouter_key.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "error": { "code": "NOT_CONFIGURED", "message": "AI features are not configured on this server." }
+            })),
+        );
+    };
+
+    let key = office::cache_key(&q);
+    if let Some(hit) = state.office_cache.read().await.get(&key).cloned() {
+        let mut out = hit;
+        out["cached"] = json!(true);
+        return (StatusCode::OK, Json(out));
+    }
+
+    match office::generate(&state.client, api_key, &q).await {
+        Ok(result) => {
+            state.office_cache.write().await.insert(key, result.clone());
+            let mut out = result;
+            out["cached"] = json!(false);
+            (StatusCode::OK, Json(out))
+        }
+        Err(msg) => {
+            eprintln!("office context error: {msg}");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({
+                    "error": { "code": "UPSTREAM_ERROR", "message": "Couldn't generate office context right now." }
+                })),
+            )
+        }
+    }
+}
+
+async fn candidate_photo(
+    State(state): State<AppState>,
+    Query(q): Query<PhotoQuery>,
+) -> (StatusCode, Json<Value>) {
+    if q.name.trim().is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": "INVALID_REQUEST", "message": "name is required" } })),
+        );
+    }
+
+    let key = photos::cache_key(&q);
+    if let Some(hit) = state.photo_cache.read().await.get(&key).cloned() {
+        return (
+            StatusCode::OK,
+            Json(json!({ "url": hit.url, "source": hit.source, "cached": true })),
+        );
+    }
+
+    let result = photos::resolve(&state.client, &q).await;
+    state
+        .photo_cache
+        .write()
+        .await
+        .insert(key, result.clone());
+
+    (
+        StatusCode::OK,
+        Json(json!({ "url": result.url, "source": result.source, "cached": false })),
+    )
+}
+
 #[derive(Deserialize)]
 struct PledgeQuery {
     zip: String,
@@ -379,12 +463,20 @@ async fn main() {
         .allow_methods([Method::GET, Method::POST])
         .allow_headers([axum::http::header::CONTENT_TYPE]);
 
+    // Wikipedia (and many sites) reject requests with no User-Agent.
+    let client = reqwest::Client::builder()
+        .user_agent("Groma/1.0 (nonpartisan civic information tool)")
+        .build()
+        .expect("failed to build HTTP client");
+
     let state = AppState {
-        client: reqwest::Client::new(),
+        client,
         api_key: Arc::new(api_key),
         openrouter_key: Arc::new(openrouter_key),
         briefing_cache: BriefingCache::default(),
         pledge_counts: PledgeCounts::default(),
+        photo_cache: PhotoCache::default(),
+        office_cache: OfficeCache::default(),
     };
 
     let app = Router::new()
@@ -392,6 +484,8 @@ async fn main() {
         .route("/api/candidate-summary", post(candidate_summary))
         .route("/api/briefings/batch", post(briefings_batch))
         .route("/api/pledges", get(pledge_count).post(pledge_add))
+        .route("/api/candidate-photo", get(candidate_photo))
+        .route("/api/office-context", get(office_context))
         .route("/api/voting-plan", post(voting_plan))
         .with_state(state)
         .layer(cors);
@@ -399,6 +493,6 @@ async fn main() {
     let port = std::env::var("PORT").unwrap_or_else(|_| "3001".to_string());
     let addr = format!("0.0.0.0:{port}");
     let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    println!("VoteScout backend listening on http://localhost:{port}");
+    println!("Groma backend listening on http://localhost:{port}");
     axum::serve(listener, app).await.unwrap();
 }

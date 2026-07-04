@@ -1,0 +1,136 @@
+/* ============================================================
+   GROMA DESIGN TOKENS
+   Single source of truth. Components consume only these.
+   ============================================================ */
+
+:root {
+  color-scheme: light;
+
+  /* ---- color: primitives ---- */
+  --ink-900: #0b1522;
+  --ink-800: #0f1b2d;
+  --ink-700: #1c2b42;
+  --ink-600: #33445e;
+  --ink-500: #52627b;
+  --ink-400: #6e7d94;
+  --paper-50: #fffefc;
+  --paper-100: #faf8f5;
+  --paper-200: #f3efe8;
+  --paper-300: #e9e3d8;
+  --paper-400: #d8d0c1;
+  --gold-600: #a37424;
+  --gold-500: #c08a2d;
+  --gold-400: #d9a441;
+  --gold-100: #f7ecd8;
+
+  /* ---- color: semantic ---- */
+  --color-bg: var(--paper-100);
+  --color-surface: var(--paper-50);
+  --color-surface-sunken: var(--paper-200);
+  --color-border: var(--paper-300);
+  --color-border-strong: var(--paper-400);
+  --color-text: var(--ink-800);
+  --color-text-strong: var(--ink-900);
+  --color-text-muted: var(--ink-500);
+  --color-accent: var(--gold-500);
+  --color-accent-hover: var(--gold-600);
+  --color-accent-soft: var(--gold-100);
+  --color-on-accent: #ffffff;
+  --color-success: #1e6b3a;
+  --color-success-soft: #e2f0e6;
+  --color-warning: #8a5a00;
+  --color-warning-soft: #f9efd9;
+  --color-info: #1f4e79;
+  --color-info-soft: #e5eef6;
+  --color-danger: #9d3121;
+  --color-danger-soft: #f8e7e3;
+
+  /* party chips: muted, equal weight — same saturation and lightness family */
+  --party-dem-bg: #e3eaf3;
+  --party-dem-text: #2f5578;
+  --party-rep-bg: #f3e5e3;
+  --party-rep-text: #7d4038;
+  --party-other-bg: var(--paper-200);
+  --party-other-text: var(--ink-500);
+
+  /* hero / dark panels (fixed, not theme-dependent) */
+  --hero-bg-1: #16233a;
+  --hero-bg-2: #0b1522;
+  --hero-text: #f5f1ea;
+  --hero-text-muted: #a9b2c4;
+
+  /* ---- type ---- */
+  --font-display: 'Fraunces', 'Georgia', serif;
+  --font-body: 'Public Sans', system-ui, -apple-system, sans-serif;
+  --text-12: 0.75rem;
+  --text-14: 0.875rem;
+  --text-16: 1rem;
+  --text-20: 1.25rem;
+  --text-24: 1.5rem;
+  --text-32: 2rem;
+  --text-48: 3rem;
+  --text-64: 4rem;
+  --leading-tight: 1.15;
+  --leading-body: 1.6;
+
+  /* ---- space: 4/8 grid ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --sp-24: 96px;
+
+  /* ---- shape & elevation ---- */
+  --radius-sm: 8px;
+  --radius-lg: 16px;
+  --shadow-1: 0 1px 2px rgba(11, 21, 34, 0.05), 0 2px 8px rgba(11, 21, 34, 0.05);
+  --shadow-2: 0 1px 3px rgba(11, 21, 34, 0.06), 0 8px 28px rgba(11, 21, 34, 0.1);
+  --shadow-3: 0 2px 6px rgba(11, 21, 34, 0.08), 0 20px 56px rgba(11, 21, 34, 0.18);
+
+  /* ---- motion ---- */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --t-fast: 150ms;
+  --t-med: 220ms;
+  --t-slow: 350ms;
+
+  /* ---- focus ---- */
+  --focus-ring: 0 0 0 3px var(--color-bg), 0 0 0 6px var(--gold-500);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-bg: #0d1524;
+  --color-surface: #162034;
+  --color-surface-sunken: #1d2940;
+  --color-border: #2a3752;
+  --color-border-strong: #3b4a68;
+  --color-text: #e6e1d7;
+  --color-text-strong: #f5f1ea;
+  --color-text-muted: #97a1b5;
+  --color-accent: var(--gold-400);
+  --color-accent-hover: #e5b657;
+  --color-accent-soft: #34302280;
+  --color-on-accent: #0f1b2d;
+  --color-success: #7bc493;
+  --color-success-soft: #1c3126;
+  --color-warning: #d9a441;
+  --color-warning-soft: #332b18;
+  --color-info: #8fb2d9;
+  --color-info-soft: #1a2a3d;
+  --color-danger: #e0857a;
+  --color-danger-soft: #38201b;
+  --party-dem-bg: #22334a;
+  --party-dem-text: #a9c4de;
+  --party-rep-bg: #402d2a;
+  --party-rep-text: #dcaaa2;
+  --party-other-bg: #242f45;
+  --party-other-text: #97a1b5;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 1px 3px rgba(0, 0, 0, 0.45), 0 8px 28px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 2px 6px rgba(0, 0, 0, 0.5), 0 20px 56px rgba(0, 0, 0, 0.6);
+  --focus-ring: 0 0 0 3px var(--color-bg), 0 0 0 6px var(--gold-400);
+}

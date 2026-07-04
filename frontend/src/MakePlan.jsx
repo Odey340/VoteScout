@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 const MONTHS = {
   Jan: 1, Feb: 2, Mar: 3, Apr: 4, May: 5, Jun: 6,
@@ -101,9 +101,9 @@ function buildPlanIcs(plan) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//VoteScout//Make a Plan//EN',
+    'PRODID:-//Groma//Make a Plan//EN',
     'BEGIN:VEVENT',
-    `UID:votescout-plan-${d}@votescout.local`,
+    `UID:groma-plan-${d}@groma.local`,
     `DTSTAMP:${d}T000000Z`,
     `DTSTART:${d}T${pad(plan.window.startHour)}0000`,
     `DTEND:${d}T${pad(plan.window.endHour)}0000`,
@@ -116,7 +116,7 @@ function buildPlanIcs(plan) {
     `DESCRIPTION:${icsEscape(
       `${plan.kind} — going ${plan.mode.label.toLowerCase()}.\n` +
         (plan.hoursText ? `Hours: ${plan.hoursText}\n` : '') +
-        'Made with VoteScout. Verify details with your local election office.',
+        'Made with Groma. Verify details with your local election office.',
     )}`,
     'BEGIN:VALARM',
     'ACTION:DISPLAY',
@@ -146,47 +146,65 @@ function renderShareImage(plan) {
   canvas.height = H
   const ctx = canvas.getContext('2d')
 
-  // Navy backdrop with flag stripe
-  ctx.fillStyle = '#12203a'
+  // Ink backdrop with a soft gold glow; gold keyline top.
+  const glow = ctx.createRadialGradient(W * 0.5, H * 0.3, 80, W * 0.5, H * 0.3, W * 0.9)
+  glow.addColorStop(0, '#1c2b42')
+  glow.addColorStop(1, '#0b1522')
+  ctx.fillStyle = glow
   ctx.fillRect(0, 0, W, H)
-  const stripe = H / 3
-  ctx.fillStyle = '#c0392b'
+  ctx.fillStyle = '#c08a2d'
   ctx.fillRect(0, 0, W, 14)
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 14, W, 14)
-  ctx.fillStyle = '#2456a6'
-  ctx.fillRect(0, 28, W, 14)
+
+  // The Groma mark: rotated surveying cross with sighting point.
+  ctx.save()
+  ctx.translate(W / 2, 200)
+  ctx.rotate(Math.PI / 4)
+  ctx.strokeStyle = '#c08a2d'
+  ctx.lineWidth = 10
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(0, -64)
+  ctx.lineTo(0, 64)
+  ctx.moveTo(-64, 0)
+  ctx.lineTo(64, 0)
+  ctx.stroke()
+  ctx.restore()
+  ctx.beginPath()
+  ctx.arc(W / 2, 200, 18, 0, Math.PI * 2)
+  ctx.fillStyle = '#0b1522'
+  ctx.fill()
+  ctx.strokeStyle = '#faf8f5'
+  ctx.lineWidth = 6
+  ctx.stroke()
 
   ctx.textAlign = 'center'
-  ctx.fillStyle = '#ffffff'
-  ctx.font = 'bold 88px "Segoe UI", sans-serif'
-  ctx.fillText('I have a voting plan', W / 2, 240)
-  ctx.font = '120px "Segoe UI Emoji", sans-serif'
-  ctx.fillText('🗳️', W / 2, 400)
+  ctx.fillStyle = '#faf8f5'
+  ctx.font = '600 88px Fraunces, Georgia, serif'
+  ctx.fillText('I have a voting plan', W / 2, 400)
 
-  ctx.font = 'bold 52px "Segoe UI", sans-serif'
-  ctx.fillStyle = '#7fa8e8'
-  ctx.fillText(plan.dateLabel, W / 2, 530)
+  ctx.font = '600 56px Fraunces, Georgia, serif'
+  ctx.fillStyle = '#d9a441'
+  ctx.fillText(plan.dateLabel, W / 2, 520)
 
-  ctx.fillStyle = '#ffffff'
-  ctx.font = '44px "Segoe UI", sans-serif'
+  ctx.fillStyle = '#faf8f5'
+  ctx.font = '44px "Public Sans", "Segoe UI", sans-serif'
   ctx.fillText(`${plan.window.label} (${plan.window.range})`, W / 2, 610)
   ctx.fillText(`${plan.mode.emoji} ${plan.mode.label}`, W / 2, 690)
 
   // City only — never the full address or site name.
   if (plan.city) {
-    ctx.fillStyle = '#c3cee3'
-    ctx.font = '38px "Segoe UI", sans-serif'
+    ctx.fillStyle = '#a9b2c4'
+    ctx.font = '38px "Public Sans", "Segoe UI", sans-serif'
     ctx.fillText(plan.city, W / 2, 780)
   }
 
-  ctx.fillStyle = '#c3cee3'
-  ctx.font = '36px "Segoe UI", sans-serif'
-  ctx.fillText(plan.election.name, W / 2, 870, W - 120)
+  ctx.fillStyle = '#a9b2c4'
+  ctx.font = '36px "Public Sans", "Segoe UI", sans-serif'
+  ctx.fillText(plan.election.name, W / 2, 868, W - 120)
 
-  ctx.fillStyle = '#64708a'
-  ctx.font = '30px "Segoe UI", sans-serif'
-  ctx.fillText('Make yours with VoteScout', W / 2, 990)
+  ctx.fillStyle = '#c08a2d'
+  ctx.font = 'italic 30px Fraunces, Georgia, serif'
+  ctx.fillText('Make yours with Groma', W / 2, 988)
 
   canvas.toBlob((blob) => {
     if (blob) downloadBlob(blob, 'i-have-a-voting-plan.png')
@@ -208,6 +226,16 @@ export default function MakePlan({ elections, address, onPlanComplete }) {
   const dayOptions = useMemo(() => buildDayOptions(elections), [elections])
 
   const [modalOpen, setModalOpen] = useState(false)
+
+  // Escape closes the wizard, matching platform modal conventions.
+  useEffect(() => {
+    if (!modalOpen) return
+    const onKey = (e) => {
+      if (e.key === 'Escape') setModalOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [modalOpen])
   const [step, setStep] = useState(0)
   const [day, setDay] = useState(null)
   const [windowKey, setWindowKey] = useState(null)
@@ -270,11 +298,13 @@ export default function MakePlan({ elections, address, onPlanComplete }) {
     : []
 
   return (
-    <section className="plan-card">
+    <section className="card plan-card">
       {inProgress && !modalOpen && (
         <div className="mp-banner">
           <span>You're partway through your voting plan.</span>
-          <button type="button" onClick={openModal}>Resume</button>
+          <button type="button" className="btn btn-primary btn-sm" onClick={openModal}>
+            Resume
+          </button>
         </div>
       )}
 
@@ -285,7 +315,7 @@ export default function MakePlan({ elections, address, onPlanComplete }) {
             Voters who decide <em>when</em> and <em>how</em> they'll vote are far more likely to
             follow through. Three quick questions and you'll have a concrete plan.
           </p>
-          <button type="button" className="plan-build" onClick={openModal}>
+          <button type="button" className="btn btn-primary" onClick={openModal}>
             Make my voting plan
           </button>
         </>
@@ -387,7 +417,7 @@ export default function MakePlan({ elections, address, onPlanComplete }) {
             {step < 3 && (
               <div className="modal-actions mp-nav">
                 {step > 0 ? (
-                  <button type="button" className="secondary" onClick={() => setStep(step - 1)}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setStep(step - 1)}>
                     Back
                   </button>
                 ) : (
@@ -395,6 +425,7 @@ export default function MakePlan({ elections, address, onPlanComplete }) {
                 )}
                 <button
                   type="button"
+                  className="btn btn-primary"
                   disabled={!canNext}
                   onClick={() => (step === 2 ? finishPlan() : setStep(step + 1))}
                 >
@@ -425,7 +456,7 @@ function PlanResult({ plan, checklist, onEdit, inModal }) {
   const pledgeText =
     `I have a voting plan 🗳️ ${plan.election.name} — ${plan.dateLabel}, ` +
     `${plan.window.label.toLowerCase()}${plan.city ? `, ${plan.city}` : ''}. ` +
-    `Make yours in 2 minutes with VoteScout.`
+    `Make yours in 2 minutes with Groma.`
 
   const inviteText =
     `I just made my voting plan for ${plan.election.name} — takes 2 minutes: ${window.location.origin}`
@@ -472,25 +503,26 @@ function PlanResult({ plan, checklist, onEdit, inModal }) {
       <div className="modal-actions mp-artifacts">
         <button
           type="button"
+          className="btn btn-primary"
           onClick={() =>
             downloadBlob(new Blob([buildPlanIcs(plan)], { type: 'text/calendar' }), 'my-voting-plan.ics')
           }
         >
           Add to calendar
         </button>
-        <button type="button" onClick={() => renderShareImage(plan)}>
+        <button type="button" className="btn btn-secondary" onClick={() => renderShareImage(plan)}>
           Download pledge card 🗳️
         </button>
-        <button type="button" onClick={() => copyText('pledge', pledgeText)}>
+        <button type="button" className="btn btn-secondary" onClick={() => copyText('pledge', pledgeText)}>
           {copied === 'pledge' ? 'Copied!' : 'Copy pledge text'}
         </button>
-        <button type="button" className="secondary" onClick={onEdit}>
+        <button type="button" className="btn btn-quiet" onClick={onEdit}>
           Start over
         </button>
       </div>
 
       <div className="mp-invite">
-        <button type="button" className="mp-invite-btn" onClick={() => copyText('invite', inviteText)}>
+        <button type="button" className="btn btn-secondary" onClick={() => copyText('invite', inviteText)}>
           {copied === 'invite' ? 'Copied! Send it to a friend' : 'Invite friends to make a plan'}
         </button>
         <p className="mp-note">

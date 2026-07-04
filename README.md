@@ -1,8 +1,10 @@
-# VoteScout
+# Groma
 
 Enter your address. See your ballot. Understand your local elections.
 
-VoteScout maps your exact polling locations using ArcGIS and uses AI to generate neutral summaries of the candidates on your specific ballot. Built with a Rust backend because it's the best language ever created.
+Groma maps your exact polling locations using ArcGIS and uses AI to generate neutral summaries of the candidates on your specific ballot. Built with a Rust backend because it's the best language ever created.
+
+*Why "Groma"? The groma was the Roman surveying instrument used to map and lay out cities — Groma maps your civic landscape.*
 
 ## Features
 
