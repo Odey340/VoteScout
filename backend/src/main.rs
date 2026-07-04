@@ -2,6 +2,7 @@ mod briefing;
 mod civic;
 mod mock;
 mod plan;
+mod pledge;
 
 use axum::{
     Router,
@@ -15,9 +16,10 @@ use serde_json::{Value, json};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 
-use briefing::{BriefingCache, BriefingRequest};
+use briefing::{BatchBriefingRequest, BriefingCache, BriefingRequest};
 use civic::{CivicError, VoterInfoOutcome};
 use plan::VotingPlanRequest;
+use pledge::PledgeCounts;
 
 #[derive(Clone)]
 struct AppState {
@@ -25,6 +27,7 @@ struct AppState {
     api_key: Arc<String>,
     openrouter_key: Arc<Option<String>>,
     briefing_cache: BriefingCache,
+    pledge_counts: PledgeCounts,
 }
 
 #[derive(Deserialize)]
@@ -143,7 +146,7 @@ async fn candidate_summary(
         );
     };
 
-    let key = briefing::cache_key(&req);
+    let key = briefing::cache_key(req.election_id.as_deref(), &req.race, &req.candidates);
 
     if let Some(cached) = state.briefing_cache.read().await.get(&key) {
         return (
@@ -152,7 +155,7 @@ async fn candidate_summary(
         );
     }
 
-    match briefing::generate_briefing(&state.client, api_key, &req).await {
+    match briefing::generate_briefing(&state.client, api_key, &req.race, &req.candidates).await {
         Ok(summary) => {
             state
                 .briefing_cache
@@ -174,6 +177,114 @@ async fn candidate_summary(
             )
         }
     }
+}
+
+/// Generate briefings for every race concurrently and stream results as
+/// NDJSON — one line per race, written the moment that race finishes, so the
+/// client can fill in cards without waiting for the slowest one.
+async fn briefings_batch(
+    State(state): State<AppState>,
+    Json(req): Json<BatchBriefingRequest>,
+) -> axum::response::Response {
+    use axum::body::Body;
+    use axum::response::IntoResponse;
+
+    if req.races.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": { "code": "INVALID_REQUEST", "message": "races are required" }
+            })),
+        )
+            .into_response();
+    }
+
+    let Some(api_key) = state.openrouter_key.as_ref() else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(json!({
+                "error": { "code": "NOT_CONFIGURED", "message": "AI briefings are not configured on this server." }
+            })),
+        )
+            .into_response();
+    };
+
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<String, std::io::Error>>(16);
+    let election_id = req.election_id.clone();
+
+    for race in req.races {
+        let client = state.client.clone();
+        let api_key = api_key.clone();
+        let cache = state.briefing_cache.clone();
+        let tx = tx.clone();
+        let key = briefing::cache_key(election_id.as_deref(), &race.race, &race.candidates);
+        tokio::spawn(async move {
+            let line = if let Some(cached) = cache.read().await.get(&key).cloned() {
+                json!({ "race": race.race, "summary": cached, "cached": true })
+            } else {
+                match briefing::generate_briefing(&client, &api_key, &race.race, &race.candidates)
+                    .await
+                {
+                    Ok(summary) => {
+                        cache.write().await.insert(key, summary.clone());
+                        json!({ "race": race.race, "summary": summary, "cached": false })
+                    }
+                    Err(msg) => {
+                        eprintln!("batch briefing error for {}: {msg}", race.race);
+                        json!({ "race": race.race, "error": true })
+                    }
+                }
+            };
+            // Receiver dropped means the client disconnected; nothing to do.
+            let _ = tx.send(Ok(format!("{line}\n"))).await;
+        });
+    }
+    drop(tx); // stream ends when the last task finishes
+
+    let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/x-ndjson")],
+        Body::from_stream(stream),
+    )
+        .into_response()
+}
+
+#[derive(Deserialize)]
+struct PledgeQuery {
+    zip: String,
+}
+
+async fn pledge_count(
+    State(state): State<AppState>,
+    Query(q): Query<PledgeQuery>,
+) -> (StatusCode, Json<Value>) {
+    let Some(zip) = pledge::normalize_zip(&q.zip) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": "INVALID_ZIP", "message": "A 5-digit ZIP is required." } })),
+        );
+    };
+    let count = pledge::get_count(&state.pledge_counts, &zip).await;
+    (StatusCode::OK, Json(json!({ "zip": zip, "count": count })))
+}
+
+#[derive(Deserialize)]
+struct PledgeBody {
+    zip: String,
+}
+
+async fn pledge_add(
+    State(state): State<AppState>,
+    Json(body): Json<PledgeBody>,
+) -> (StatusCode, Json<Value>) {
+    let Some(zip) = pledge::normalize_zip(&body.zip) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": { "code": "INVALID_ZIP", "message": "A 5-digit ZIP is required." } })),
+        );
+    };
+    let count = pledge::increment(&state.pledge_counts, &zip).await;
+    (StatusCode::OK, Json(json!({ "zip": zip, "count": count })))
 }
 
 async fn voting_plan(
@@ -273,11 +384,14 @@ async fn main() {
         api_key: Arc::new(api_key),
         openrouter_key: Arc::new(openrouter_key),
         briefing_cache: BriefingCache::default(),
+        pledge_counts: PledgeCounts::default(),
     };
 
     let app = Router::new()
         .route("/api/elections", get(get_elections))
         .route("/api/candidate-summary", post(candidate_summary))
+        .route("/api/briefings/batch", post(briefings_batch))
+        .route("/api/pledges", get(pledge_count).post(pledge_add))
         .route("/api/voting-plan", post(voting_plan))
         .with_state(state)
         .layer(cors);

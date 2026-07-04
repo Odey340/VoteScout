@@ -1,0 +1,18 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//VoteScout//Make a Plan//EN
+BEGIN:VEVENT
+UID:votescout-plan-20260804@votescout.local
+DTSTAMP:20260804T000000Z
+DTSTART:20260804T070000
+DTEND:20260804T100000
+SUMMARY:Vote: Virginia Republican Primary Election
+LOCATION:MAIN LIBRARY\, 101 E Franklin St\, Richmond\, VA\, 23219
+DESCRIPTION:Election Day — going driving.\nHours: Tue\, Aug 4: 6 am - 7 pm\nMade with VoteScout. Verify details with your local election office.
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Time to vote: Virginia Republican Primary Election
+TRIGGER:-PT2H
+END:VALARM
+END:VEVENT
+END:VCALENDAR

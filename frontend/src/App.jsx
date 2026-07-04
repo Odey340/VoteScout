@@ -1,9 +1,35 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import ElectionMap from './ElectionMap.jsx'
-import VotingPlan from './VotingPlan.jsx'
+import MakePlan from './MakePlan.jsx'
 import './App.css'
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? 'http://localhost:3001'
+
+const raceKey = (election, contest) => `${election.id ?? election.name}::${contest.office}`
+
+function loadReviewed(electionIds) {
+  const out = new Set()
+  for (const id of electionIds) {
+    try {
+      const stored = JSON.parse(localStorage.getItem(`votescout-reviewed-${id}`) ?? '[]')
+      for (const office of stored) out.add(`${id}::${office}`)
+    } catch {
+      // corrupted entry — ignore
+    }
+  }
+  return out
+}
+
+function persistReviewed(electionId, office) {
+  const storageKey = `votescout-reviewed-${electionId}`
+  try {
+    const stored = new Set(JSON.parse(localStorage.getItem(storageKey) ?? '[]'))
+    stored.add(office)
+    localStorage.setItem(storageKey, JSON.stringify([...stored]))
+  } catch {
+    // storage unavailable (private mode) — progress just won't persist
+  }
+}
 
 function daysUntil(dateStr) {
   const today = new Date()
@@ -32,7 +58,7 @@ function DaysBadge({ date }) {
   )
 }
 
-function ElectionCard({ election }) {
+function ElectionCard({ election, briefings, reviewed, onReview, onRetry }) {
   return (
     <article className="card">
       <div className="card-header">
@@ -51,82 +77,133 @@ function ElectionCard({ election }) {
       {election.contests?.length > 0 && (
         <div className="card-section">
           <h3>On the ballot</h3>
-          {election.contests.map((contest) => (
-            <div className="contest" key={contest.office}>
-              <strong>{contest.office}</strong>
-              {contest.subtitle && <p className="contest-subtitle">{contest.subtitle}</p>}
-              <ul>
-                {contest.candidates.map((c) => (
-                  <li key={c.name}>
-                    {c.candidateUrl ? (
-                      <a href={c.candidateUrl} target="_blank" rel="noopener noreferrer">
-                        {c.name}
-                      </a>
-                    ) : (
-                      c.name
-                    )}
-                    {c.party && <span className={`party party-${c.party.toLowerCase()}`}>{c.party}</span>}
-                  </li>
-                ))}
-              </ul>
-              <RaceBriefing contest={contest} />
-            </div>
-          ))}
+          {election.contests.map((contest) => {
+            const key = raceKey(election, contest)
+            return (
+              <div className="contest" key={contest.office}>
+                <strong>
+                  {contest.office}
+                  {reviewed.has(key) && (
+                    <span className="reviewed-check" title="Briefing reviewed">✓</span>
+                  )}
+                </strong>
+                {contest.subtitle && <p className="contest-subtitle">{contest.subtitle}</p>}
+                <ul>
+                  {contest.candidates.map((c) => (
+                    <li key={c.name}>
+                      {c.candidateUrl ? (
+                        <a href={c.candidateUrl} target="_blank" rel="noopener noreferrer">
+                          {c.name}
+                        </a>
+                      ) : (
+                        c.name
+                      )}
+                      {c.party && <span className={`party party-${c.party.toLowerCase()}`}>{c.party}</span>}
+                    </li>
+                  ))}
+                </ul>
+                <RaceBriefing
+                  briefing={briefings[key]}
+                  onOpen={() => onReview(election, contest)}
+                  onRetry={() => onRetry(election, contest)}
+                />
+              </div>
+            )
+          })}
         </div>
       )}
     </article>
   )
 }
 
-function RaceBriefing({ contest }) {
+function RaceBriefing({ briefing, onOpen, onRetry }) {
   const [open, setOpen] = useState(false)
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
+  const status = briefing?.status ?? 'loading'
 
-  async function toggle() {
+  function toggle() {
     const opening = !open
     setOpen(opening)
-    if (!opening || summary || loading) return
-
-    setLoading(true)
-    setError(null)
-    try {
-      const res = await fetch(`${API_BASE}/api/candidate-summary`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          race: contest.office,
-          candidates: contest.candidates.map((c) => ({ name: c.name, party: c.party })),
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data?.error?.message ?? `Server responded ${res.status}`)
-      setSummary(data.summary)
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
+    if (opening && status === 'ready') onOpen()
   }
+
+  // If the panel is open while the briefing arrives, count it as reviewed.
+  useEffect(() => {
+    if (open && status === 'ready') onOpen()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, status])
 
   return (
     <div className="briefing">
       <button type="button" className="briefing-toggle" onClick={toggle} aria-expanded={open}>
         <span className={`briefing-chevron${open ? ' open' : ''}`}>▸</span>
         AI Race Briefing
+        {status === 'loading' && <span className="briefing-spinner" aria-hidden="true" />}
       </button>
       {open && (
         <div className="briefing-panel">
           <p className="briefing-disclaimer">
             AI-generated summary — verify with official sources.
           </p>
-          {loading && <p className="briefing-loading">Generating briefing…</p>}
-          {error && <p className="briefing-error">{error}</p>}
-          {summary && <div className="briefing-text">{summary}</div>}
+          {status === 'loading' && (
+            <div className="skeleton-block" role="status" aria-label="Generating your briefing">
+              <p className="briefing-loading">Generating your briefing…</p>
+              <div className="skeleton-line" />
+              <div className="skeleton-line" />
+              <div className="skeleton-line short" />
+            </div>
+          )}
+          {status === 'error' && (
+            <div>
+              <p className="briefing-error">Couldn't generate this briefing.</p>
+              <button type="button" className="briefing-retry" onClick={onRetry}>
+                Retry
+              </button>
+            </div>
+          )}
+          {status === 'ready' && <div className="briefing-text">{briefing.summary}</div>}
         </div>
       )}
     </div>
+  )
+}
+
+function ReadinessBar({ total, reviewedCount, onMakePlan, onShare }) {
+  const pct = total === 0 ? 0 : Math.round((reviewedCount / total) * 100)
+  const done = total > 0 && reviewedCount >= total
+  return (
+    <div className={`readiness${done ? ' readiness-done' : ''}`}>
+      {!done ? (
+        <>
+          <div className="readiness-head">
+            <strong>Feel ready in 5 minutes</strong>
+            <span>
+              You've reviewed {reviewedCount} of {total} race{total === 1 ? '' : 's'}
+            </span>
+          </div>
+          <div className="readiness-track" role="progressbar" aria-valuenow={pct} aria-valuemin="0" aria-valuemax="100">
+            <div className="readiness-fill" style={{ width: `${pct}%` }} />
+          </div>
+        </>
+      ) : (
+        <div className="readiness-celebrate">
+          <strong>You're ballot-ready ✅</strong>
+          <span>You've reviewed every race. Two quick next steps:</span>
+          <div className="readiness-actions">
+            <button type="button" onClick={onMakePlan}>Make your voting plan</button>
+            <button type="button" className="secondary" onClick={onShare}>Share your pledge card</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PledgeBanner({ count, zip }) {
+  if (count == null) return null
+  return (
+    <p className="pledge-banner">
+      🗳️ <strong>{count.toLocaleString()}</strong> people in {zip} have made a voting plan on VoteScout.
+    </p>
   )
 }
 
@@ -153,10 +230,131 @@ export default function App() {
   const [street, setStreet] = useState('')
   const [elections, setElections] = useState(null)
   const [searchedAddress, setSearchedAddress] = useState('')
+  const [searchedZip, setSearchedZip] = useState('')
   const [emptyMessage, setEmptyMessage] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [needsStreet, setNeedsStreet] = useState(false)
+  const [briefings, setBriefings] = useState({})
+  const [reviewed, setReviewed] = useState(() => new Set())
+  const [pledgeCount, setPledgeCount] = useState(null)
+
+  const totalRaces = useMemo(
+    () => (elections ?? []).reduce((n, e) => n + (e.contests?.length ?? 0), 0),
+    [elections],
+  )
+  const reviewedCount = useMemo(() => {
+    if (!elections) return 0
+    let n = 0
+    for (const e of elections) {
+      for (const c of e.contests ?? []) {
+        if (reviewed.has(raceKey(e, c))) n++
+      }
+    }
+    return n
+  }, [elections, reviewed])
+
+  /** Stream batch briefings for one election; each NDJSON line fills a card. */
+  async function fetchBriefings(election, onlyOffices = null) {
+    const contests = (election.contests ?? []).filter(
+      (c) => !onlyOffices || onlyOffices.includes(c.office),
+    )
+    if (!contests.length) return
+
+    setBriefings((prev) => {
+      const next = { ...prev }
+      for (const c of contests) next[raceKey(election, c)] = { status: 'loading' }
+      return next
+    })
+
+    const markErrored = () =>
+      setBriefings((prev) => {
+        const next = { ...prev }
+        for (const c of contests) {
+          if (next[raceKey(election, c)]?.status === 'loading') {
+            next[raceKey(election, c)] = { status: 'error' }
+          }
+        }
+        return next
+      })
+
+    try {
+      const res = await fetch(`${API_BASE}/api/briefings/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          electionId: election.id ?? election.name,
+          races: contests.map((c) => ({
+            race: c.office,
+            candidates: c.candidates.map((cand) => ({ name: cand.name, party: cand.party })),
+          })),
+        }),
+      })
+      if (!res.ok || !res.body) {
+        markErrored()
+        return
+      }
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop()
+        for (const line of lines) {
+          if (!line.trim()) continue
+          try {
+            const item = JSON.parse(line)
+            const key = `${election.id ?? election.name}::${item.race}`
+            setBriefings((prev) => ({
+              ...prev,
+              [key]: item.error
+                ? { status: 'error' }
+                : { status: 'ready', summary: item.summary },
+            }))
+          } catch {
+            // skip malformed line
+          }
+        }
+      }
+      markErrored() // anything still loading when the stream closed failed server-side
+    } catch {
+      markErrored()
+    }
+  }
+
+  function markReviewed(election, contest) {
+    const key = raceKey(election, contest)
+    if (reviewed.has(key)) return
+    setReviewed((prev) => new Set(prev).add(key))
+    persistReviewed(election.id ?? election.name, contest.office)
+  }
+
+  function retryBriefing(election, contest) {
+    fetchBriefings(election, [contest.office])
+  }
+
+  async function handlePlanComplete() {
+    if (!searchedZip) return
+    try {
+      const res = await fetch(`${API_BASE}/api/pledges`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zip: searchedZip }),
+      })
+      const data = await res.json()
+      if (res.ok) setPledgeCount(data.count)
+    } catch {
+      // counter is decorative; never block the plan on it
+    }
+  }
+
+  function scrollToPlan() {
+    document.querySelector('.plan-card')?.scrollIntoView({ behavior: 'smooth' })
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -182,6 +380,21 @@ export default function App() {
       setElections(data.elections)
       setSearchedAddress(address)
       setEmptyMessage(data.message)
+
+      const zip5 = (zip.match(/\d{5}/) ?? [''])[0]
+      setSearchedZip(zip5)
+      setBriefings({})
+      setReviewed(loadReviewed(data.elections.map((el) => el.id ?? el.name)))
+      setPledgeCount(null)
+
+      // Kick off everything that doesn't need to block the results render.
+      for (const el of data.elections) fetchBriefings(el)
+      if (zip5) {
+        fetch(`${API_BASE}/api/pledges?zip=${zip5}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => d && setPledgeCount(d.count))
+          .catch(() => {})
+      }
     } catch (err) {
       setError(err.message)
       setElections(null)
@@ -230,11 +443,33 @@ export default function App() {
         {elections?.length === 0 && (
           <p className="empty">{emptyMessage ?? 'No upcoming elections found for that address.'}</p>
         )}
+        {totalRaces > 0 && (
+          <ReadinessBar
+            total={totalRaces}
+            reviewedCount={reviewedCount}
+            onMakePlan={scrollToPlan}
+            onShare={scrollToPlan}
+          />
+        )}
+        {elections?.length > 0 && <PledgeBanner count={pledgeCount} zip={searchedZip} />}
         {elections && <ElectionMap elections={elections} address={searchedAddress} />}
         {elections?.map((election) => (
-          <ElectionCard key={election.id} election={election} />
+          <ElectionCard
+            key={election.id}
+            election={election}
+            briefings={briefings}
+            reviewed={reviewed}
+            onReview={markReviewed}
+            onRetry={retryBriefing}
+          />
         ))}
-        {elections?.length > 0 && <VotingPlan elections={elections} address={searchedAddress} />}
+        {elections?.length > 0 && (
+          <MakePlan
+            elections={elections}
+            address={searchedAddress}
+            onPlanComplete={handlePlanComplete}
+          />
+        )}
       </main>
 
       <footer className="footer">

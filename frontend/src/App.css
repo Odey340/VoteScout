@@ -318,6 +318,120 @@ body {
   color: var(--red);
 }
 
+/* ---------- Readiness progress ---------- */
+
+.readiness {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1rem 1.5rem;
+  box-shadow: 0 2px 10px rgba(27, 42, 74, 0.06);
+}
+
+.readiness-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  margin-bottom: 0.6rem;
+}
+
+.readiness-head strong {
+  color: var(--navy);
+}
+
+.readiness-head span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.readiness-track {
+  height: 10px;
+  background: var(--bg);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.readiness-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blue), #4a7fd4);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+.readiness-done {
+  border-color: #bfe3c6;
+  background: #f2faf3;
+}
+
+.readiness-celebrate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.readiness-celebrate strong {
+  font-size: 1.15rem;
+  color: #1e7a33;
+}
+
+.readiness-celebrate span {
+  color: var(--muted);
+}
+
+.readiness-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.readiness-actions button {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.6rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.readiness-actions button.secondary {
+  background: #fff;
+  color: var(--navy);
+  border: 1px solid var(--border);
+}
+
+/* ---------- Pledge banner ---------- */
+
+.pledge-banner {
+  margin: 0;
+  text-align: center;
+  background: var(--blue-soft);
+  border: 1px solid #d5e2f5;
+  border-radius: 10px;
+  padding: 0.7rem 1rem;
+  font-size: 0.98rem;
+}
+
+/* ---------- Reviewed check ---------- */
+
+.reviewed-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  margin-left: 0.45rem;
+  border-radius: 50%;
+  background: #d9f0de;
+  color: #1e7a33;
+  font-size: 0.75rem;
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
 /* ---------- AI Race Briefing ---------- */
 
 .briefing {
@@ -383,6 +497,72 @@ body {
   white-space: pre-wrap;
   font-size: 0.95rem;
   line-height: 1.55;
+}
+
+.briefing-spinner {
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid #c8d8f0;
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.skeleton-line {
+  height: 0.8rem;
+  border-radius: 6px;
+  margin-top: 0.55rem;
+  background: linear-gradient(90deg, #dde6f3 25%, #eef3fa 50%, #dde6f3 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-line.short {
+  width: 60%;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.briefing-retry {
+  margin-top: 0.5rem;
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.45rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ---------- Invite friends ---------- */
+
+.mp-invite {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.mp-invite-btn {
+  background: var(--navy);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 0.65rem 1.2rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mp-invite-btn:hover {
+  background: var(--navy-deep);
 }
 
 /* ---------- Map ---------- */
@@ -548,6 +728,191 @@ body {
 .plan-error {
   margin: 0.75rem 0 0;
   color: var(--red);
+}
+
+/* ---------- Make a Plan wizard ---------- */
+
+.mp-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #fff8e6;
+  border: 1px solid #f0dfae;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+}
+
+.mp-banner button {
+  background: var(--blue);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.4rem 1rem;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mp-progress {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.mp-dot {
+  width: 34px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.mp-dot.on {
+  background: var(--blue);
+}
+
+.mp-step h4 {
+  margin: 0 0 0.9rem;
+  font-size: 1.15rem;
+  color: var(--navy);
+}
+
+.mp-days {
+  display: grid;
+  gap: 0.6rem;
+  max-height: 46vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.mp-daycard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  text-align: left;
+  background: var(--bg);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.12s;
+}
+
+.mp-daycard:hover {
+  border-color: #9fb8de;
+}
+
+.mp-daycard.selected {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.mp-daycard small {
+  color: var(--muted);
+}
+
+.mp-kind {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--blue);
+}
+
+.mp-kind-eday {
+  color: var(--red);
+}
+
+.chip-big {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.7rem 1.3rem;
+}
+
+.chip-big small {
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+.mp-nav {
+  justify-content: space-between;
+  margin-top: 1.25rem;
+}
+
+.mp-nav button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mp-result {
+  overflow-y: auto;
+}
+
+.mp-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.mp-plan-emoji {
+  font-size: 2.4rem;
+}
+
+.mp-plan-title {
+  margin: 0;
+  font-size: 1.3rem;
+  color: var(--navy);
+}
+
+.mp-plan-sub {
+  margin: 0.15rem 0 0;
+  color: var(--muted);
+}
+
+.mp-where {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.mp-where .mp-hours,
+.mp-daycard .mp-hours {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.mp-checklist {
+  margin: 0 0 1.25rem;
+  padding-left: 1.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mp-checklist a {
+  color: var(--blue);
+  font-weight: 600;
+}
+
+.mp-artifacts {
+  flex-wrap: wrap;
+}
+
+.mp-note {
+  margin: 0.75rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
 }
 
 /* ---------- Modal ---------- */

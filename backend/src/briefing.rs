@@ -9,15 +9,32 @@ const MODEL: &str = "anthropic/claude-sonnet-5";
 pub type BriefingCache = Arc<RwLock<HashMap<String, String>>>;
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BriefingRequest {
     pub race: String,
     pub candidates: Vec<CandidateInput>,
+    #[serde(default)]
+    pub election_id: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct CandidateInput {
     pub name: String,
     pub party: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchBriefingRequest {
+    #[serde(default)]
+    pub election_id: Option<String>,
+    pub races: Vec<RaceInput>,
+}
+
+#[derive(Deserialize)]
+pub struct RaceInput {
+    pub race: String,
+    pub candidates: Vec<CandidateInput>,
 }
 
 #[derive(Serialize)]
@@ -59,10 +76,11 @@ struct OpenRouterErrorBody {
     message: String,
 }
 
-/// Cache key: race plus the candidate roster, so a changed field re-generates.
-pub fn cache_key(req: &BriefingRequest) -> String {
-    let mut key = req.race.clone();
-    for c in &req.candidates {
+/// Cache key: election ID + race + candidate roster, so a second user in the
+/// same area hits the cache and a changed roster re-generates.
+pub fn cache_key(election_id: Option<&str>, race: &str, candidates: &[CandidateInput]) -> String {
+    let mut key = format!("{}|{}", election_id.unwrap_or("_"), race);
+    for c in candidates {
         key.push('|');
         key.push_str(&c.name);
         if let Some(p) = &c.party {
@@ -73,9 +91,8 @@ pub fn cache_key(req: &BriefingRequest) -> String {
     key
 }
 
-fn build_prompt(req: &BriefingRequest) -> String {
-    let roster = req
-        .candidates
+fn build_prompt(race: &str, candidates: &[CandidateInput]) -> String {
+    let roster = candidates
         .iter()
         .map(|c| match &c.party {
             Some(p) => format!("- {} ({})", c.name, p),
@@ -98,7 +115,7 @@ fn build_prompt(req: &BriefingRequest) -> String {
            inventing biography, positions, or accomplishments.\n\
          - Do not speculate about who is likely to win.\n\
          - Plain text only: no markdown headers, no bold, simple paragraphs and hyphenated lists.",
-        race = req.race,
+        race = race,
         roster = roster
     )
 }
@@ -106,14 +123,15 @@ fn build_prompt(req: &BriefingRequest) -> String {
 pub async fn generate_briefing(
     client: &reqwest::Client,
     api_key: &str,
-    req: &BriefingRequest,
+    race: &str,
+    candidates: &[CandidateInput],
 ) -> Result<String, String> {
     let body = ChatRequest {
         model: MODEL,
         max_tokens: 1024,
         messages: vec![ChatMessage {
             role: "user",
-            content: build_prompt(req),
+            content: build_prompt(race, candidates),
         }],
     };
 
