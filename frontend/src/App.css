@@ -422,36 +422,104 @@ a:hover {
   to { transform: rotate(360deg); }
 }
 
-/* ============ theme toggle ============ */
+/* ============ top controls (language + theme) ============ */
 
-.theme-toggle {
+.top-controls {
   position: fixed;
   top: var(--sp-4);
   right: var(--sp-4);
   z-index: 50;
-  width: 42px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.theme-toggle,
+.lang-toggle {
   height: 42px;
-  border-radius: 50%;
+  border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--hero-text) 25%, transparent);
   background: color-mix(in srgb, var(--ink-900) 40%, transparent);
   backdrop-filter: blur(6px);
   color: var(--hero-text);
-  font-size: var(--text-16);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  font-weight: 600;
   cursor: pointer;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
   transition: transform var(--t-med) var(--ease), background var(--t-med) var(--ease);
+}
+
+.theme-toggle {
+  width: 42px;
+  font-size: var(--text-16);
+}
+
+.lang-toggle {
+  padding: 0 var(--sp-4);
+  letter-spacing: 0.04em;
 }
 
 .theme-toggle:hover {
   transform: rotate(15deg) scale(1.06);
 }
 
-.page.has-results .theme-toggle {
+.lang-toggle:hover {
+  transform: translateY(-1px);
+}
+
+.page.has-results .theme-toggle,
+.page.has-results .lang-toggle {
   background: var(--color-surface);
   border-color: var(--color-border);
   color: var(--color-text);
   box-shadow: var(--shadow-1);
+}
+
+.lang-switcher {
+  position: relative;
+}
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + var(--sp-2));
+  right: 0;
+  list-style: none;
+  margin: 0;
+  padding: var(--sp-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-2);
+  min-width: 10rem;
+  animation: fade-in var(--t-fast) var(--ease);
+}
+
+.lang-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-body);
+  font-size: var(--text-14);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease);
+}
+
+.lang-menu button:hover {
+  background: var(--color-surface-sunken);
+}
+
+.lang-menu button.active {
+  font-weight: 700;
+  color: var(--color-accent-hover);
 }
 
 /* ============ PAGE: hero ============ */
@@ -1525,7 +1593,7 @@ a:hover {
 /* ============ print: the voting plan ============ */
 
 @media print {
-  .theme-toggle,
+  .top-controls,
   .hero,
   .mobile-bar,
   .footer,

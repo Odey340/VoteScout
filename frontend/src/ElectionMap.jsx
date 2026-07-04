@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import Map from '@arcgis/core/Map.js'
 import MapView from '@arcgis/core/views/MapView.js'
 import Graphic from '@arcgis/core/Graphic.js'
@@ -9,9 +10,9 @@ const GEOCODE_URL =
   'https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/findAddressCandidates'
 
 const LOCATION_TYPES = [
-  { key: 'pollingLocations', label: 'Polling place', color: [192, 138, 45] }, // gold
-  { key: 'earlyVoteSites', label: 'Early voting', color: [31, 78, 121] }, // info blue
-  { key: 'dropOffLocations', label: 'Ballot drop-off', color: [15, 27, 45] }, // ink
+  { key: 'pollingLocations', labelKey: 'results.legendPolling', color: [192, 138, 45] }, // gold
+  { key: 'earlyVoteSites', labelKey: 'results.legendEarly', color: [31, 78, 121] }, // info blue
+  { key: 'dropOffLocations', labelKey: 'results.legendDropOff', color: [15, 27, 45] }, // ink
 ]
 
 async function geocode(address) {
@@ -49,6 +50,7 @@ function homeSymbol() {
 }
 
 export default function ElectionMap({ elections, address }) {
+  const { t } = useTranslation()
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -71,10 +73,10 @@ export default function ElectionMap({ elections, address }) {
               geometry: { type: 'point', latitude: loc.lat, longitude: loc.lng },
               symbol: markerSymbol(type.color),
               attributes: {
-                name: loc.name || type.label,
+                name: loc.name || t(type.labelKey),
                 address: loc.address || '',
                 hours: (loc.hours || '').replaceAll('\n', '<br>'),
-                kind: type.label,
+                kind: t(type.labelKey),
               },
               popupTemplate: {
                 title: '{name}',
@@ -114,8 +116,8 @@ export default function ElectionMap({ elections, address }) {
           new Graphic({
             geometry: { type: 'point', latitude: home.lat, longitude: home.lng },
             symbol: homeSymbol(),
-            attributes: { name: 'Your address', address, hours: '', kind: 'Search location' },
-            popupTemplate: { title: 'Your address', content: address },
+            attributes: { name: t('results.legendYourAddress'), address, hours: '', kind: '' },
+            popupTemplate: { title: t('results.legendYourAddress'), content: address },
           }),
         )
         view.center = [home.lng, home.lat]
@@ -140,7 +142,9 @@ export default function ElectionMap({ elections, address }) {
       cancelled = true
       view.destroy()
     }
-  }, [elections, address])
+    // t: popup/legend labels bake into graphics at build time, so rebuild on
+    // language change.
+  }, [elections, address, t])
 
   const presentTypes = LOCATION_TYPES.filter((t) =>
     elections.some((e) => (e[t.key] ?? []).some((l) => l.lat != null && l.lng != null)),
@@ -152,15 +156,15 @@ export default function ElectionMap({ elections, address }) {
       <div className="map-legend">
         <span className="legend-item">
           <span className="legend-swatch legend-home" />
-          Your address
+          {t('results.legendYourAddress')}
         </span>
-        {presentTypes.map((t) => (
-          <span className="legend-item" key={t.key}>
+        {presentTypes.map((type) => (
+          <span className="legend-item" key={type.key}>
             <span
               className="legend-swatch"
-              style={{ background: `rgb(${t.color.join(',')})` }}
+              style={{ background: `rgb(${type.color.join(',')})` }}
             />
-            {t.label}
+            {t(type.labelKey)}
           </span>
         ))}
       </div>

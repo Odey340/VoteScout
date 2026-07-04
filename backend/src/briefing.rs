@@ -15,6 +15,8 @@ pub struct BriefingRequest {
     pub candidates: Vec<CandidateInput>,
     #[serde(default)]
     pub election_id: Option<String>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 #[derive(Deserialize, Clone)]
@@ -29,6 +31,8 @@ pub struct BatchBriefingRequest {
     #[serde(default)]
     pub election_id: Option<String>,
     pub races: Vec<RaceInput>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -76,10 +80,16 @@ struct OpenRouterErrorBody {
     message: String,
 }
 
-/// Cache key: election ID + race + candidate roster, so a second user in the
-/// same area hits the cache and a changed roster re-generates.
-pub fn cache_key(election_id: Option<&str>, race: &str, candidates: &[CandidateInput]) -> String {
-    let mut key = format!("{}|{}", election_id.unwrap_or("_"), race);
+/// Cache key: language + election ID + race + candidate roster, so a second
+/// user in the same area and language hits the cache and a changed roster
+/// re-generates.
+pub fn cache_key(
+    lang: &str,
+    election_id: Option<&str>,
+    race: &str,
+    candidates: &[CandidateInput],
+) -> String {
+    let mut key = format!("{lang}|{}|{}", election_id.unwrap_or("_"), race);
     for c in candidates {
         key.push('|');
         key.push_str(&c.name);
@@ -91,7 +101,7 @@ pub fn cache_key(election_id: Option<&str>, race: &str, candidates: &[CandidateI
     key
 }
 
-fn build_prompt(race: &str, candidates: &[CandidateInput]) -> String {
+fn build_prompt(race: &str, candidates: &[CandidateInput], lang: &str) -> String {
     let roster = candidates
         .iter()
         .map(|c| match &c.party {
@@ -114,9 +124,10 @@ fn build_prompt(race: &str, candidates: &[CandidateInput]) -> String {
            (e.g. \"Little public information is available about this candidate\") rather than \
            inventing biography, positions, or accomplishments.\n\
          - Do not speculate about who is likely to win.\n\
-         - Plain text only: no markdown headers, no bold, simple paragraphs and hyphenated lists.",
+         - Plain text only: no markdown headers, no bold, simple paragraphs and hyphenated lists.{lang_block}",
         race = race,
-        roster = roster
+        roster = roster,
+        lang_block = crate::lang::instruction(lang)
     )
 }
 
@@ -125,13 +136,14 @@ pub async fn generate_briefing(
     api_key: &str,
     race: &str,
     candidates: &[CandidateInput],
+    lang: &str,
 ) -> Result<String, String> {
     let body = ChatRequest {
         model: MODEL,
-        max_tokens: 1024,
+        max_tokens: 2048,
         messages: vec![ChatMessage {
             role: "user",
-            content: build_prompt(race, candidates),
+            content: build_prompt(race, candidates, lang),
         }],
     };
 

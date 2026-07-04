@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import CandidateAvatar from './CandidateAvatar.jsx'
 import ElectionMap from './ElectionMap.jsx'
 import GromaMark from './GromaMark.jsx'
+import { DATE_LOCALES, LANGUAGES } from './i18n.js'
 import MakePlan from './MakePlan.jsx'
 import './App.css'
 
@@ -49,16 +51,20 @@ function daysUntil(dateStr) {
   return Math.round((target - today) / (1000 * 60 * 60 * 24))
 }
 
-function formatDate(dateStr) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+function useFormatDate() {
+  const { i18n } = useTranslation()
+  const locale = DATE_LOCALES[i18n.resolvedLanguage] ?? 'en-US'
+  return (dateStr) =>
+    new Date(dateStr + 'T00:00:00').toLocaleDateString(locale, {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
 }
 
 function ThemeToggle() {
+  const { t } = useTranslation()
   const [dark, setDark] = useState(() => document.documentElement.dataset.theme === 'dark')
 
   function toggle() {
@@ -77,51 +83,107 @@ function ThemeToggle() {
       type="button"
       className="theme-toggle"
       onClick={toggle}
-      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={dark ? 'Light mode' : 'Dark mode'}
+      aria-label={dark ? t('theme.toLight') : t('theme.toDark')}
     >
       {dark ? '☀️' : '🌙'}
     </button>
   )
 }
 
+function LanguageSwitcher() {
+  const { i18n, t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', onDown)
+    return () => document.removeEventListener('pointerdown', onDown)
+  }, [open])
+
+  return (
+    <div className="lang-switcher" ref={ref}>
+      <button
+        type="button"
+        className="lang-toggle"
+        onClick={() => setOpen(!open)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={t('lang.label')}
+      >
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" />
+          <path d="M2 12h20M12 2c2.7 2.9 4 6.4 4 10s-1.3 7.1-4 10c-2.7-2.9-4-6.4-4-10s1.3-7.1 4-10z" />
+        </svg>
+        {i18n.resolvedLanguage?.toUpperCase() ?? 'EN'}
+      </button>
+      {open && (
+        <ul className="lang-menu" role="listbox" aria-label={t('lang.label')}>
+          {LANGUAGES.map((l) => (
+            <li key={l.code}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={i18n.resolvedLanguage === l.code}
+                className={i18n.resolvedLanguage === l.code ? 'active' : ''}
+                onClick={() => {
+                  i18n.changeLanguage(l.code)
+                  setOpen(false)
+                }}
+              >
+                {l.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 function Countdown({ date }) {
+  const { t } = useTranslation()
   const days = daysUntil(date)
   if (days < 0)
     return (
       <div className="countdown">
         <strong>—</strong>
-        <span>Past</span>
+        <span>{t('masthead.past')}</span>
       </div>
     )
   if (days === 0)
     return (
       <div className="countdown">
-        <strong>Today</strong>
-        <span>Vote now</span>
+        <strong>{t('masthead.today')}</strong>
+        <span>{t('masthead.voteNow')}</span>
       </div>
     )
   return (
     <div className="countdown">
       <strong>{days}</strong>
-      <span>day{days === 1 ? '' : 's'} left</span>
+      <span>{t('masthead.daysLeft', { count: days })}</span>
     </div>
   )
 }
 
 /** Official-notice masthead with the readiness bar integrated. */
 function Masthead({ election, total, reviewedCount, onMakePlan }) {
+  const { t } = useTranslation()
+  const formatDate = useFormatDate()
   const pct = total === 0 ? 0 : Math.round((reviewedCount / total) * 100)
   const done = total > 0 && reviewedCount >= total
   return (
     <div className="masthead">
-      <p className="masthead-notice">Official election information · {formatDate(election.date)}</p>
+      <p className="masthead-notice">
+        {t('masthead.notice')} · {formatDate(election.date)}
+      </p>
       <div className="masthead-row">
         <div>
           <h2>{election.name}</h2>
-          <p className="masthead-date">
-            Polls and deadlines vary by locality — confirm with your election office.
-          </p>
+          <p className="masthead-date">{t('masthead.confirmNote')}</p>
         </div>
         <Countdown date={election.date} />
       </div>
@@ -131,10 +193,8 @@ function Masthead({ election, total, reviewedCount, onMakePlan }) {
           {!done ? (
             <>
               <div className="readiness-head">
-                <strong>Ballot readiness</strong>
-                <span>
-                  {reviewedCount} of {total} race{total === 1 ? '' : 's'} reviewed
-                </span>
+                <strong>{t('masthead.readiness')}</strong>
+                <span>{t('masthead.reviewed', { reviewed: reviewedCount, total, count: total })}</span>
               </div>
               <div
                 className="readiness-track"
@@ -148,10 +208,10 @@ function Masthead({ election, total, reviewedCount, onMakePlan }) {
             </>
           ) : (
             <div className="readiness-celebrate">
-              <strong>✓ You're ballot-ready</strong>
+              <strong>{t('masthead.ballotReady')}</strong>
               <div className="readiness-actions">
                 <button type="button" className="btn btn-primary btn-sm" onClick={onMakePlan}>
-                  Make your voting plan
+                  {t('masthead.makePlan')}
                 </button>
               </div>
             </div>
@@ -184,19 +244,21 @@ function Collapsible({ label, loading, children }) {
 }
 
 function OfficeContext({ officeCtx, onRetry }) {
+  const { t, i18n } = useTranslation()
   const status = officeCtx?.status ?? 'loading'
-  const asOf = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const asOf = new Date().toLocaleDateString(DATE_LOCALES[i18n.resolvedLanguage] ?? 'en-US', {
+    month: 'long',
+    year: 'numeric',
+  })
 
   return (
     <div className="office-ctx">
-      <Collapsible label="About this seat" loading={status === 'loading'}>
+      <Collapsible label={t('race.aboutSeat')} loading={status === 'loading'}>
         <div className="panel">
-          <p className="panel-disclaimer">
-            AI-generated context · as of {asOf} — verify with official sources.
-          </p>
+          <p className="panel-disclaimer">{t('race.aiContextDisclaimer', { date: asOf })}</p>
           {status === 'loading' && (
-            <div role="status" aria-label="Generating office context">
-              <p className="panel-loading">Researching this office…</p>
+            <div role="status" aria-label={t('race.researching')}>
+              <p className="panel-loading">{t('race.researching')}</p>
               <div className="skeleton-line" />
               <div className="skeleton-line" />
               <div className="skeleton-line short" />
@@ -204,9 +266,9 @@ function OfficeContext({ officeCtx, onRetry }) {
           )}
           {status === 'error' && (
             <div>
-              <p className="panel-error">Couldn't generate office context.</p>
+              <p className="panel-error">{t('race.contextError')}</p>
               <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
-                Retry
+                {t('race.retry')}
               </button>
             </div>
           )}
@@ -215,7 +277,7 @@ function OfficeContext({ officeCtx, onRetry }) {
               <div className="panel-text">{officeCtx.context}</div>
               {officeCtx.sources?.length > 0 && (
                 <p className="office-sources">
-                  Sources:{' '}
+                  {t('race.sources')}{' '}
                   {officeCtx.sources.map((s, i) => (
                     <span key={s.url}>
                       {i > 0 && ' · '}
@@ -235,6 +297,7 @@ function OfficeContext({ officeCtx, onRetry }) {
 }
 
 function RaceBriefing({ briefing, onOpen, onRetry }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const status = briefing?.status ?? 'loading'
 
@@ -253,16 +316,16 @@ function RaceBriefing({ briefing, onOpen, onRetry }) {
         aria-expanded={open}
       >
         <span className={`collapse-chevron${open ? ' open' : ''}`}>▶</span>
-        Candidate briefing
+        {t('race.briefing')}
         {status === 'loading' && <span className="spinner" aria-hidden="true" />}
       </button>
       <div className={`collapse-body${open ? ' open' : ''}`}>
         <div>
           <div className="panel">
-            <p className="panel-disclaimer">AI-generated summary — verify with official sources.</p>
+            <p className="panel-disclaimer">{t('race.aiDisclaimer')}</p>
             {status === 'loading' && (
-              <div role="status" aria-label="Generating your briefing">
-                <p className="panel-loading">Generating your briefing…</p>
+              <div role="status" aria-label={t('race.generating')}>
+                <p className="panel-loading">{t('race.generating')}</p>
                 <div className="skeleton-line" />
                 <div className="skeleton-line" />
                 <div className="skeleton-line short" />
@@ -270,9 +333,9 @@ function RaceBriefing({ briefing, onOpen, onRetry }) {
             )}
             {status === 'error' && (
               <div>
-                <p className="panel-error">Couldn't generate this briefing.</p>
+                <p className="panel-error">{t('race.briefingError')}</p>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={onRetry}>
-                  Retry
+                  {t('race.retry')}
                 </button>
               </div>
             )}
@@ -281,6 +344,15 @@ function RaceBriefing({ briefing, onOpen, onRetry }) {
         </div>
       </div>
     </div>
+  )
+}
+
+function ReviewedCheck() {
+  const { t } = useTranslation()
+  return (
+    <span className="reviewed-check" title={t('race.reviewedTooltip')}>
+      ✓
+    </span>
   )
 }
 
@@ -300,7 +372,7 @@ function RaceCard({
       {showElectionTag && <div className="race-election-tag">{election.name}</div>}
       <h3>
         {contest.office}
-        {isReviewed && <span className="reviewed-check" title="Briefing reviewed">✓</span>}
+        {isReviewed && <ReviewedCheck />}
       </h3>
       {contest.subtitle && <p className="contest-subtitle">{contest.subtitle}</p>}
 
@@ -337,7 +409,12 @@ function PledgeBanner({ count, zip }) {
   if (count == null) return null
   return (
     <p className="pledge-banner">
-      🗳️ <strong>{count.toLocaleString()}</strong> people in {zip} have made a voting plan on Groma.
+      🗳️{' '}
+      <Trans
+        i18nKey="results.pledgeBanner"
+        values={{ count: count.toLocaleString(), zip }}
+        components={{ strong: <strong /> }}
+      />
     </p>
   )
 }
@@ -367,6 +444,7 @@ function LocationSection({ title, locations }) {
 
 /** Custom empty state: the groma finds no elections on the horizon. */
 function EmptyState({ message }) {
+  const { t } = useTranslation()
   return (
     <div className="empty">
       <svg width="120" height="90" viewBox="0 0 120 90" fill="none" aria-hidden="true">
@@ -381,34 +459,23 @@ function EmptyState({ message }) {
         <circle cx="90" cy="72" r="1.6" fill="currentColor" />
         <circle cx="100" cy="64" r="1.6" fill="currentColor" />
       </svg>
-      <h3>Nothing on the horizon here</h3>
-      <p>{message ?? 'No upcoming elections found for that address.'}</p>
-      <p>
-        Election data comes from official sources and covers supported upcoming elections — your
-        local election office always has the fullest picture.
-      </p>
+      <h3>{t('results.emptyTitle')}</h3>
+      <p>{message ?? t('results.emptyDefault')}</p>
+      <p>{t('results.emptyNote')}</p>
     </div>
   )
 }
 
 function HowItWorks() {
+  const { t } = useTranslation()
   const steps = [
-    {
-      title: 'Look up your ballot',
-      body: 'Enter your address and we pull your exact elections, races, and polling places from official election data.',
-    },
-    {
-      title: 'Get briefed on every race',
-      body: 'Clearly-labeled AI summaries explain each office and introduce every candidate evenhandedly — never who to pick.',
-    },
-    {
-      title: 'Make a plan to vote',
-      body: 'Choose your day, time, and route. Get a calendar reminder and a checklist so nothing surprises you.',
-    },
+    { title: t('how.step1Title'), body: t('how.step1Body') },
+    { title: t('how.step2Title'), body: t('how.step2Body') },
+    { title: t('how.step3Title'), body: t('how.step3Body') },
   ]
   return (
     <section className="how">
-      <h2>How Groma works</h2>
+      <h2>{t('how.title')}</h2>
       <div className="how-steps">
         {steps.map((s, i) => (
           <div className="how-step" key={s.title}>
@@ -423,6 +490,7 @@ function HowItWorks() {
 }
 
 function Footer() {
+  const { t } = useTranslation()
   return (
     <footer className="footer">
       <div className="footer-inner">
@@ -431,39 +499,33 @@ function Footer() {
             <GromaMark size={22} className="mark" />
             <span>Groma</span>
           </div>
-          <p>
-            Groma is a nonpartisan tool that helps you understand your ballot and make a plan to
-            vote. Named for the Roman surveying instrument used to map and lay out cities — Groma
-            maps your civic landscape.
-          </p>
+          <p>{t('footer.blurb')}</p>
         </div>
         <div>
-          <h4>Data sources</h4>
+          <h4>{t('footer.dataSources')}</h4>
           <ul>
             <li><a href="https://developers.google.com/civic-information" target="_blank" rel="noopener noreferrer">Google Civic Information API</a></li>
             <li><a href="https://en.wikipedia.org" target="_blank" rel="noopener noreferrer">Wikipedia</a></li>
-            <li>AI summaries: Claude (clearly labeled)</li>
+            <li>{t('footer.aiNote')}</li>
           </ul>
         </div>
         <div>
-          <h4>Official resources</h4>
+          <h4>{t('footer.officialResources')}</h4>
           <ul>
-            <li><a href="https://vote.gov" target="_blank" rel="noopener noreferrer">Register to vote — vote.gov</a></li>
-            <li><a href="https://www.usa.gov/election-office" target="_blank" rel="noopener noreferrer">Find your election office</a></li>
-            <li><a href="https://www.usa.gov/voter-id" target="_blank" rel="noopener noreferrer">Voter ID requirements</a></li>
+            <li><a href="https://vote.gov" target="_blank" rel="noopener noreferrer">{t('footer.register')}</a></li>
+            <li><a href="https://www.usa.gov/election-office" target="_blank" rel="noopener noreferrer">{t('footer.findOffice')}</a></li>
+            <li><a href="https://www.usa.gov/voter-id" target="_blank" rel="noopener noreferrer">{t('footer.voterID')}</a></li>
           </ul>
         </div>
       </div>
-      <div className="footer-legal">
-        Groma is not affiliated with any government agency, party, or campaign. AI-generated
-        content is clearly labeled and can contain mistakes — always confirm details with your
-        local election office.
-      </div>
+      <div className="footer-legal">{t('footer.legal')}</div>
     </footer>
   )
 }
 
 export default function App() {
+  const { t, i18n } = useTranslation()
+  const lang = i18n.resolvedLanguage ?? 'en'
   const [zip, setZip] = useState('')
   const [street, setStreet] = useState('')
   const [elections, setElections] = useState(null)
@@ -523,6 +585,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           electionId: election.id ?? election.name,
+          lang,
           races: contests.map((c) => ({
             race: c.office,
             candidates: c.candidates.map((cand) => ({ name: cand.name, party: cand.party })),
@@ -573,6 +636,7 @@ export default function App() {
       office: contest.office,
       state: stateMatch[1] ?? '',
       candidates: contest.candidates.map((c) => c.name).join(', '),
+      lang,
     })
     // Civic API marks incumbency on candidates when it knows it.
     const incumbent = contest.candidates.find((c) => c.incumbent)
@@ -617,6 +681,19 @@ export default function App() {
       // counter is decorative; never block the plan on it
     }
   }
+
+  // Switching language re-requests AI content in that language; the
+  // language-keyed backend cache makes revisits free.
+  useEffect(() => {
+    if (!elections?.length) return
+    setBriefings({})
+    setOfficeCtxs({})
+    for (const el of elections) {
+      fetchBriefings(el)
+      for (const contest of el.contests ?? []) fetchOfficeContext(el, contest, searchedAddress)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lang])
 
   function scrollToPlan() {
     document.querySelector('.plan-card')?.scrollIntoView({ behavior: 'smooth' })
@@ -682,7 +759,10 @@ export default function App() {
 
   return (
     <div className={`page${hasResults ? ' has-results' : ''}`}>
-      <ThemeToggle />
+      <div className="top-controls">
+        <LanguageSwitcher />
+        <ThemeToggle />
+      </div>
 
       <header className="hero">
         <div className="hero-grid" aria-hidden="true" />
@@ -694,12 +774,9 @@ export default function App() {
           </div>
 
           <h1 className="hero-headline">
-            Know your ballot in <em>five minutes</em>
+            <Trans i18nKey="hero.headline" components={{ em: <em /> }} />
           </h1>
-          <p className="tagline">
-            Your elections, your polling place, and every race explained — clearly, evenhandedly,
-            and free.
-          </p>
+          <p className="tagline">{t('hero.tagline')}</p>
 
           <form className="search" onSubmit={handleSubmit}>
             <input
@@ -707,8 +784,8 @@ export default function App() {
               type="text"
               inputMode="numeric"
               pattern="\d{5}(-\d{4})?"
-              placeholder="ZIP code"
-              aria-label="ZIP code"
+              placeholder={t('hero.zipPlaceholder')}
+              aria-label={t('hero.zipPlaceholder')}
               value={zip}
               onChange={(e) => setZip(e.target.value)}
               required
@@ -716,24 +793,28 @@ export default function App() {
             <input
               className={`input street-input${needsStreet ? ' input-error' : ''}`}
               type="text"
-              placeholder={needsStreet ? 'Street address (required)' : 'Street address (optional)'}
-              aria-label="Street address"
+              placeholder={needsStreet ? t('hero.streetRequired') : t('hero.streetOptional')}
+              aria-label={t('hero.streetOptional')}
               value={street}
               onChange={(e) => setStreet(e.target.value)}
             />
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Searching…' : 'Find my ballot'}
+              {loading ? t('hero.ctaLoading') : t('hero.cta')}
             </button>
           </form>
-          {error && <p className="error">{needsStreet ? error : `Something went wrong: ${error}`}</p>}
+          {error && (
+            <p className="error">
+              {needsStreet ? error : t('hero.somethingWrong', { message: error })}
+            </p>
+          )}
 
           <div className="trust-row">
-            <span><span className="dot">●</span> Official election data</span>
-            <span><span className="dot">●</span> AI summaries clearly labeled</span>
-            <span><span className="dot">●</span> Nonpartisan &amp; free</span>
+            <span><span className="dot">●</span> {t('hero.trustData')}</span>
+            <span><span className="dot">●</span> {t('hero.trustAI')}</span>
+            <span><span className="dot">●</span> {t('hero.trustFree')}</span>
           </div>
         </div>
-        {!hasResults && <p className="hero-scroll">How it works ↓</p>}
+        {!hasResults && <p className="hero-scroll">{t('hero.howItWorksScroll')}</p>}
       </header>
 
       {!hasResults && <HowItWorks />}
@@ -760,7 +841,7 @@ export default function App() {
 
               <div className="results-grid">
                 <div className="results-main">
-                  {totalRaces > 0 && <p className="races-title">On your ballot</p>}
+                  {totalRaces > 0 && <p className="races-title">{t('results.onYourBallot')}</p>}
                   {elections.flatMap((election) =>
                     (election.contests ?? []).map((contest) => (
                       <RaceCard
@@ -789,9 +870,9 @@ export default function App() {
                   <ElectionMap elections={elections} address={searchedAddress} />
                   {elections.map((election) => (
                     <div key={`side-${election.id ?? election.name}`} style={{ display: 'contents' }}>
-                      <LocationSection title="Polling locations" locations={election.pollingLocations} />
-                      <LocationSection title="Early voting" locations={election.earlyVoteSites} />
-                      <LocationSection title="Ballot drop-off" locations={election.dropOffLocations} />
+                      <LocationSection title={t('results.pollingLocations')} locations={election.pollingLocations} />
+                      <LocationSection title={t('results.earlyVoting')} locations={election.earlyVoteSites} />
+                      <LocationSection title={t('results.dropOff')} locations={election.dropOffLocations} />
                     </div>
                   ))}
                 </aside>
@@ -799,10 +880,10 @@ export default function App() {
 
               <div className="mobile-bar">
                 <button type="button" className="btn btn-secondary" onClick={scrollToMap}>
-                  Where to vote
+                  {t('results.whereToVote')}
                 </button>
                 <button type="button" className="btn btn-primary" onClick={scrollToPlan}>
-                  Make a plan
+                  {t('results.makePlanShort')}
                 </button>
               </div>
             </>

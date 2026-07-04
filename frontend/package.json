@@ -10,8 +10,11 @@
   },
   "dependencies": {
     "@arcgis/core": "^5.1.9",
+    "i18next": "^26.3.4",
+    "i18next-browser-languagedetector": "^8.2.1",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-i18next": "^17.0.8"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.4",

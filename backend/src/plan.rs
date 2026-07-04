@@ -12,6 +12,8 @@ pub struct VotingPlanRequest {
     #[serde(default)]
     pub selected_races: Vec<String>,
     pub elections: Vec<PlanElection>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -173,10 +175,11 @@ fn build_prompt(req: &VotingPlanRequest) -> String {
            followed by a blank line, and hyphens for lists.\n\
          - Keep it under 500 words.\n\
          - Output only the email body, starting with the greeting — no subject line, no \
-           commentary before or after.",
+           commentary before or after.{lang_block}",
         address = req.address,
         interests = interests,
-        data = data
+        data = data,
+        lang_block = crate::lang::instruction(crate::lang::normalize(req.lang.as_deref())),
     )
 }
 

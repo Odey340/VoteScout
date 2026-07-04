@@ -1,5 +1,6 @@
 mod briefing;
 mod civic;
+mod lang;
 mod mock;
 mod office;
 mod photos;
@@ -152,7 +153,8 @@ async fn candidate_summary(
         );
     };
 
-    let key = briefing::cache_key(req.election_id.as_deref(), &req.race, &req.candidates);
+    let lang = lang::normalize(req.lang.as_deref());
+    let key = briefing::cache_key(lang, req.election_id.as_deref(), &req.race, &req.candidates);
 
     if let Some(cached) = state.briefing_cache.read().await.get(&key) {
         return (
@@ -161,7 +163,9 @@ async fn candidate_summary(
         );
     }
 
-    match briefing::generate_briefing(&state.client, api_key, &req.race, &req.candidates).await {
+    match briefing::generate_briefing(&state.client, api_key, &req.race, &req.candidates, lang)
+        .await
+    {
         Ok(summary) => {
             state
                 .briefing_cache
@@ -217,19 +221,26 @@ async fn briefings_batch(
 
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<String, std::io::Error>>(16);
     let election_id = req.election_id.clone();
+    let lang = lang::normalize(req.lang.as_deref());
 
     for race in req.races {
         let client = state.client.clone();
         let api_key = api_key.clone();
         let cache = state.briefing_cache.clone();
         let tx = tx.clone();
-        let key = briefing::cache_key(election_id.as_deref(), &race.race, &race.candidates);
+        let key = briefing::cache_key(lang, election_id.as_deref(), &race.race, &race.candidates);
         tokio::spawn(async move {
             let line = if let Some(cached) = cache.read().await.get(&key).cloned() {
                 json!({ "race": race.race, "summary": cached, "cached": true })
             } else {
-                match briefing::generate_briefing(&client, &api_key, &race.race, &race.candidates)
-                    .await
+                match briefing::generate_briefing(
+                    &client,
+                    &api_key,
+                    &race.race,
+                    &race.candidates,
+                    lang,
+                )
+                .await
                 {
                     Ok(summary) => {
                         cache.write().await.insert(key, summary.clone());

@@ -22,10 +22,17 @@ pub struct OfficeQuery {
     /// Comma-separated candidate names — lets the model spot an open seat.
     #[serde(default)]
     pub candidates: Option<String>,
+    #[serde(default)]
+    pub lang: Option<String>,
 }
 
 pub fn cache_key(q: &OfficeQuery) -> String {
-    format!("{}|{}", q.office.to_lowercase(), q.state.to_lowercase())
+    format!(
+        "{}|{}|{}",
+        crate::lang::normalize(q.lang.as_deref()),
+        q.office.to_lowercase(),
+        q.state.to_lowercase()
+    )
 }
 
 struct Grounding {
@@ -257,7 +264,8 @@ fn build_prompt(q: &OfficeQuery, grounding: &Grounding) -> String {
            rather than guessing.\n\
          - Never suggest the officeholder or any candidate is good or bad. No endorsements, \
            no predictions.\n\
-         - Plain text only. Use the section titles above in caps. Under 250 words total.",
+         - Plain text only. Use the section titles above in caps (translated into the output \
+           language). Under 250 words total.{lang_block}",
         office = q.office,
         state_part = if q.state.is_empty() {
             String::new()
@@ -275,6 +283,7 @@ fn build_prompt(q: &OfficeQuery, grounding: &Grounding) -> String {
             .as_deref()
             .map(|i| format!("Incumbent hint from election data: {i}\n"))
             .unwrap_or_default(),
+        lang_block = crate::lang::instruction(crate::lang::normalize(q.lang.as_deref())),
     )
 }
 
