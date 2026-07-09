@@ -1,6 +1,6 @@
 # Groma
 
-Enter your address. See your ballot. Understand your local elections.
+Enter your address. See your ballot. Understand your local elections. For the 2026 Vulcan Technologies Hackathon
 
 Groma maps your exact polling locations using ArcGIS and uses AI to generate neutral summaries of the candidates on your specific ballot. Built with a Rust backend because it's the best language ever created.
 
